@@ -49,13 +49,15 @@ The frontend uses server-issued tokens. Counselor assignments, slot requests, ch
 
 ## Production API (Render)
 
-The local backend uses SQLite. Production is configured separately to use PostgreSQL so local development remains unchanged. The Render Blueprint is in `render.yaml`; production Prisma schemas and migrations are under `backend/prisma`.
+The local backend uses SQLite. Production uses PostgreSQL so local development remains unchanged. The Render Blueprint is in `render.yaml`; production Prisma schemas and migrations are under `backend/prisma`. The Blueprint uses a free Render web service and static site, with Neon Free PostgreSQL configured separately.
 
-1. Put the project in a GitHub repository and connect it to a Render account.
-2. In Render, create a Blueprint from that repository and review the service/database plans and pricing before applying it. This blueprint provisions web and database resources.
-3. Render wires the web service hostname into the API's `CLIENT_ORIGIN` and the API hostname into the web service's `VITE_API_BASE_URL`.
-4. Enter `SUPER_ADMIN_NAME`, `SUPER_ADMIN_EMAIL`, and a unique `SUPER_ADMIN_PASSWORD` directly into Render when prompted. Do not put these values in source files or chat. Render generates `JWT_SECRET` automatically.
+1. Create a PostgreSQL project on [Neon's Free plan](https://neon.com/pricing) and copy its connection string from the Neon dashboard. Keep this URL private; it contains database credentials.
+2. In Render, create a Blueprint from the GitHub repository and review the plans before applying it. The Blueprint does not create a database; it prompts for `DATABASE_URL`.
+3. Enter Neon's PostgreSQL connection string as `DATABASE_URL`, plus `SUPER_ADMIN_NAME`, `SUPER_ADMIN_EMAIL`, and a unique `SUPER_ADMIN_PASSWORD`, directly in Render. Do not put these values in source files or chat. Render generates `JWT_SECRET` automatically.
+4. Render wires the web service hostname into the API's `CLIENT_ORIGIN` and the API hostname into the static site's `VITE_API_BASE_URL`.
 5. Wait for the backend service to report healthy at `/api/health`. Its HTTPS URL plus `/api` is the Android build's `VITE_API_BASE_URL`.
+
+Free-tier services have limits and are intended for testing and hobby projects, not production. Render may spin the API down after 15 minutes of inactivity, so the first request after idle can take about a minute. Its free service filesystem is temporary, which is why production data must use PostgreSQL rather than SQLite. Neon Free has compute, storage, and data-transfer limits and scales to zero; monitor both providers' usage and terms. Do not add a payment method unless you choose to accept possible charges.
 
 The API hashes passwords, issues expiring verifiable tokens, rate-limits authentication, restricts data endpoints by role, and seeds the super-admin from Render environment variables. Existing local plaintext passwords are upgraded to hashes on their next sign-in. Render configuration is preparation only; it does not deploy anything or create service URLs by itself.
 
