@@ -1,0 +1,10 @@
+NeotrikPathways/
+│
+├── settings.gradle.kts        <-- Paste Project settings code here
+├── build.gradle.kts           <-- Paste Root build script code here
+│
+├── gradle/                    <-- Create this folder if it doesn't exist
+│   └── libs.versions.toml     <-- Create and paste catalog code here
+│
+└── app/
+    └── build.gradle.kts       <-- Paste App module build script code here

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Neoterik Pathways</string>
+    <string name="title_activity_main">Neoterik Pathways</string>
+    <string name="package_name">com.neoterik.pathways</string>
+    <string name="custom_url_scheme">com.neoterik.pathways</string>
+</resources>

@@ -1,0 +1,128 @@
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(180deg, #f4f9ff 0%, #eefbf4 100%);
+  color: #1f2937;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.auth-panel {
+  box-shadow: 0 12px 30px rgba(27, 41, 59, 0.10);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.auth-panel:hover {
+  box-shadow: 0 16px 36px rgba(27, 41, 59, 0.13);
+  transform: translateY(-2px);
+}
+
+.auth-control {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.auth-control:focus {
+  outline: none;
+  border-color: #7894ad !important;
+  box-shadow: 0 0 0 3px rgba(74, 115, 151, 0.14);
+}
+
+.dashboard-card {
+  box-shadow: 0 4px 14px rgba(27, 41, 59, 0.05);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(27, 41, 59, 0.09);
+}
+
+.ui-button {
+  transition: filter 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.ui-button:hover {
+  filter: brightness(0.93);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(27, 41, 59, 0.14);
+}
+
+.ui-button:active {
+  transform: translateY(0);
+}
+
+.profile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(19, 31, 43, 0.48);
+}
+
+.profile-dialog {
+  width: min(100%, 480px);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid #dce3ea;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(19, 31, 43, 0.22);
+}
+
+.profile-heading,
+.profile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-heading {
+  margin-bottom: 18px;
+}
+
+.profile-heading h2 {
+  margin: 0;
+  color: #243447;
+  font-size: 20px;
+}
+
+.profile-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: #f1f4f7;
+  color: #344054;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.profile-actions {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .profile-dialog {
+    padding: 18px;
+  }
+
+  .profile-backdrop {
+    padding: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-panel,
+  .auth-control,
+  .dashboard-card,
+  .ui-button {
+    transition: none;
+  }
+}

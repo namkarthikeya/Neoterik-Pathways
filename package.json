@@ -1,0 +1,19 @@
+{
+  "name": "neoterik-pathways",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB -c green,blue \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev -- --host 0.0.0.0",
+    "build": "npm --prefix frontend run build",
+    "android:sync": "npm --prefix frontend run cap:sync",
+    "android:open": "npm --prefix frontend run cap:open"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

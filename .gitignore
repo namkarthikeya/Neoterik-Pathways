@@ -1,0 +1,11 @@
+node_modules/
+.idea/
+frontend/dist/
+backend/.env
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/**/build/
+*.jks
+*.keystore

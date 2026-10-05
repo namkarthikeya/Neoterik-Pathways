@@ -1,0 +1,18 @@
+neoterik-pathways/
+├── backend/
+│   ├── prisma/
+│   │   └── schema.prisma
+│   ├── .env
+│   ├── package.json
+│   └── server.js
+├── frontend/
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── .env
+│   ├── package.json
+│   └── vite.config.js
+└── package.json

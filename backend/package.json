@@ -1,0 +1,36 @@
+{
+  "name": "neoterik-pathways-backend",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "prisma db push && node --watch src/server.js",
+    "start": "node src/server.js",
+    "test:security": "node scripts/test-security.js",
+    "db:push": "prisma db push",
+    "db:migrate:production": "prisma migrate deploy --schema=prisma/schema.production.prisma",
+    "db:seed:super-admin": "node scripts/seed-super-admin.js",
+    "db:studio": "prisma studio",
+    "prisma:generate": "prisma generate",
+    "prisma:generate:production": "prisma generate --schema=prisma/schema.production.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "prisma": "6.19.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0",
+    "effect": "^3.20.0"
+  }
+}

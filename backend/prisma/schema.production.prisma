@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  password     String
+  mobile       String?
+  presentClass String?
+  degree       String?
+  role         String    @default("Student")
+  status       String    @default("PENDING")
+  assignedAdminId String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  assignedAdmin User?    @relation("StudentAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  students      User[]   @relation("StudentAdmin")
+  bookings      Booking[] @relation("StudentBookings")
+  administeredBookings Booking[] @relation("AdminBookings")
+
+  @@index([assignedAdminId])
+}
+
+model Booking {
+  id            String    @id @default(cuid())
+  userId        String?
+  adminId       String?
+  slot          String?
+  type          String?
+  studentName   String?
+  college       String?
+  course        String?
+  appointmentAt DateTime?
+  status        String    @default("PENDING")
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User?     @relation("StudentBookings", fields: [userId], references: [id], onDelete: SetNull)
+  admin         User?     @relation("AdminBookings", fields: [adminId], references: [id], onDelete: SetNull)
+  messages      BookingMessage[]
+
+  @@index([userId, status, createdAt])
+  @@index([adminId, status, createdAt])
+}
+
+model BookingMessage {
+  id         String   @id @default(cuid())
+  bookingId  String
+  senderId   String
+  senderName String
+  body       String
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+}
+
+model College {
+  id        String   @id @default(cuid())
+  name      String
+  cutoff    String?
+  location  String?
+  website   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
