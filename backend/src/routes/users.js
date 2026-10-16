@@ -75,3 +75,14 @@ usersRouter.patch('/:id', requireRoles('SuperAdmin'), asyncHandler(async (reques
   });
   response.json(admin);
 }));
+
+usersRouter.delete('/:id', requireRoles('SuperAdmin'), asyncHandler(async (request, response) => {
+  const result = await prisma.user.deleteMany({
+    where: { id: request.params.id, role: { in: ['Student', 'Admin'] } }
+  });
+  if (result.count !== 1) {
+    return response.status(404).json({ error: 'Student or admin account not found' });
+  }
+
+  response.status(204).end();
+}));

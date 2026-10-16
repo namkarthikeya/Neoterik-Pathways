@@ -11,6 +11,7 @@ const API_BASE = apiOrigin
   : '';
 const LEGACY_STORAGE_KEY = 'neoterik_pathways_users';
 const REGISTERED_FLAG_KEY = 'neoterik_pathways_has_account';
+const SESSION_TOKEN_KEY = 'neoterik_pathways_session_token';
 const CLASS_OPTIONS = [
   '6th Completed Class',
   '7th Completed Class',
@@ -95,8 +96,9 @@ const getInitialAuthMode = () => {
 
 export default function App() {
   // Navigation & Session State
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem(SESSION_TOKEN_KEY));
   const [user, setUser] = useState(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(localStorage.getItem(SESSION_TOKEN_KEY)));
   const [authMode, setAuthMode] = useState(getInitialAuthMode); // 'login' or 'register'
 
   // Auth Form Inputs
@@ -158,6 +160,7 @@ export default function App() {
   const [bookingMsg, setBookingMsg] = useState('');
   const [bookingRequests, setBookingRequests] = useState([]);
   const [messageDrafts, setMessageDrafts] = useState({});
+  const [openConversations, setOpenConversations] = useState({});
   // Page 3: Admin Dashboard State
   const [pendingSlots, setPendingSlots] = useState([]);
   const [myStudents, setMyStudents] = useState([]);
@@ -168,6 +171,46 @@ export default function App() {
   const [colleges, setColleges] = useState([]);
   const [newCollege, setNewCollege] = useState({ name: '', cutoff: '', location: '' });
   const [allUsers, setAllUsers] = useState([]);
+  const [bookingRecords, setBookingRecords] = useState([]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    let active = true;
+    const restoreSession = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/auth/profile`, {
+          headers: authHeaders(token)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!active) return;
+
+        if (response.status === 401) {
+          localStorage.removeItem(SESSION_TOKEN_KEY);
+          setToken(null);
+          setUser(null);
+          setAuthError(data.error || 'Your session expired. Please log in again.');
+          return;
+        }
+        if (!response.ok || !data.user) {
+          throw new Error(data.error || 'Unable to restore your session.');
+        }
+
+        setUser(buildUserRecord(data.user));
+        setAssignedAdmin(data.user.assignedAdmin || null);
+      } catch (error) {
+        if (!active) return;
+        setAuthError(error instanceof Error ? error.message : 'Unable to restore your session.');
+      } finally {
+        if (active) setIsRestoringSession(false);
+      }
+    };
+
+    restoreSession();
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   // Handle Login & Registration
   const handleAuth = async (event) => {
@@ -215,6 +258,7 @@ export default function App() {
         if (!data.token) throw new Error('The server did not issue a sign-in token.');
         const loggedInUser = buildUserRecord(data.user);
         localStorage.setItem(REGISTERED_FLAG_KEY, 'true');
+        localStorage.setItem(SESSION_TOKEN_KEY, data.token);
         setToken(data.token);
         setUser(loggedInUser);
         return;
@@ -232,6 +276,7 @@ export default function App() {
       }
 
       if (!data.token) throw new Error('The server did not issue a sign-in token.');
+      localStorage.setItem(SESSION_TOKEN_KEY, data.token);
       setToken(data.token);
       setUser(newUser);
       setAuthMode('login');
@@ -241,6 +286,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
     setToken(null);
     setUser(null);
     setDashboardError('');
@@ -343,12 +389,14 @@ export default function App() {
           })));
           setBookingRequests(bookings);
         } else if (user.role === 'SuperAdmin') {
-          const [users, colleges] = await Promise.all([
+          const [users, colleges, records] = await Promise.all([
             requestApi('/users', token),
-            requestApi('/colleges', token)
+            requestApi('/colleges', token),
+            requestApi('/bookings/records', token)
           ]);
           if (!active) return;
           setAllUsers(users);
+          setBookingRecords(records);
           setAllAdmins(users.filter((entry) => entry.role === 'Admin'));
           setStudentMatrix(users
             .filter((entry) => entry.role === 'Student')
@@ -474,6 +522,34 @@ export default function App() {
     </div>
   );
 
+  const renderSessionActions = (booking, contactLabel, mobile) => (
+    <>
+      <div style={styles.sessionActions}>
+        <button
+          className="ui-button"
+          type="button"
+          onClick={() => setOpenConversations((previous) => ({
+            ...previous,
+            [booking.id]: !previous[booking.id]
+          }))}
+          style={styles.btnSecondary}
+          aria-expanded={Boolean(openConversations[booking.id])}
+        >
+          {openConversations[booking.id] ? 'Close chat' : 'Open chat'}
+        </button>
+        {mobile && mobile !== 'N/A' ? (
+          <a className="ui-button" href={`tel:${mobile}`} style={styles.callLink}>Call {contactLabel}</a>
+        ) : (
+          <button className="ui-button" type="button" disabled style={styles.btnSecondary}>Call unavailable</button>
+        )}
+      </div>
+      {openConversations[booking.id] && renderConversation(booking)}
+      <p style={styles.recordNotice}>
+        Chat messages are saved for safety. Participants can see their session chat; saved session records are available only to Super Admin.
+      </p>
+    </>
+  );
+
   const syncSuperAdminUsers = async () => {
     try {
       const response = await fetch(`${API_BASE}/users`, {
@@ -524,6 +600,24 @@ export default function App() {
     await syncSuperAdminUsers();
   };
 
+  const handleRemoveUser = async (managedUser) => {
+    const details = managedUser.role === 'Admin'
+      ? 'Their assigned students will become unassigned.'
+      : 'Their account will lose access.';
+    const confirmed = window.confirm(
+      `Remove ${managedUser.role.toLowerCase()} "${managedUser.name}"? ${details} Historical bookings will be kept.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await requestApi(`/users/${managedUser.id}`, token, { method: 'DELETE' });
+      setDashboardError('');
+      await syncSuperAdminUsers();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'Unable to remove this account.');
+    }
+  };
+
   // Super Admin: Add College
   const handleAddCollege = async () => {
     if (!newCollege.name.trim()) return;
@@ -556,6 +650,14 @@ export default function App() {
   // ==========================================
   // PAGE 1: AUTHENTICATION INTERFACE
   // ==========================================
+  if (isRestoringSession) {
+    return (
+      <div role="status" style={{ ...styles.authContainer, background: authPalette.pageBg }}>
+        <p style={{ ...styles.subtitle, color: authPalette.primary }}>Restoring your session...</p>
+      </div>
+    );
+  }
+
   if (!token || !user) {
     return (
       <div style={{ ...styles.authContainer, background: authPalette.pageBg }}>
@@ -629,12 +731,12 @@ export default function App() {
   // ==========================================
   const renderHeader = (title) => (
     <>
-      <header style={styles.header}>
-        <div>
+      <header className="dashboard-header" style={styles.header}>
+        <div className="dashboard-header-title">
           <h2 style={{ margin: 0, color: '#1a1a1a' }}>{title}</h2>
-          <span style={styles.userBadge}>👤 {user.name} ({user.role})</span>
+          <span className="dashboard-user-badge" style={styles.userBadge}>👤 {user.name} ({user.role})</span>
         </div>
-        <div style={styles.headerActions}>
+        <div className="dashboard-header-actions" style={styles.headerActions}>
           {user.role !== 'SuperAdmin' && (
             <button className="ui-button" onClick={handleOpenProfile} style={styles.btnSecondary}>My Profile</button>
           )}
@@ -706,10 +808,10 @@ export default function App() {
   // ==========================================
   if (user.role === 'Student') {
     return (
-      <div style={styles.dashboard}>
+      <div className="dashboard-container" style={styles.dashboard}>
         {renderHeader('Student Career & Counseling Portal')}
 
-        <div style={styles.grid}>
+        <div className="dashboard-grid" style={styles.grid}>
           {/* Card 1: Assigned Admin */}
           <div className="dashboard-card" style={styles.card}>
             <h3>👩‍🏫 Admin Who Accepted You</h3>
@@ -751,10 +853,11 @@ export default function App() {
                 ) : (
                   <>
                     <p>Accepted by {booking.acceptedBy?.name || booking.adminName}</p>
-                    {(booking.acceptedBy?.mobile || assignedAdmin?.mobile) && (
-                      <a className="ui-button" href={`tel:${booking.acceptedBy?.mobile || assignedAdmin.mobile}`} style={styles.callLink}>Call admin</a>
+                    {renderSessionActions(
+                      booking,
+                      'Admin',
+                      booking.acceptedBy?.mobile || assignedAdmin?.mobile
                     )}
-                    {renderConversation(booking)}
                   </>
                 )}
               </div>
@@ -771,10 +874,10 @@ export default function App() {
   // ==========================================
   if (user.role === 'Admin') {
     return (
-      <div style={styles.dashboard}>
+      <div className="dashboard-container" style={styles.dashboard}>
         {renderHeader('Admin Counseling Management')}
 
-        <div style={styles.grid}>
+        <div className="dashboard-grid" style={styles.grid}>
           {/* Card 1: Pending Slot Requests */}
           <div className="dashboard-card" style={{ ...styles.card, gridColumn: 'span 2' }}>
             <h3>🧑‍🎓 Students Waiting for Admin</h3>
@@ -850,10 +953,7 @@ export default function App() {
               <div key={booking.id} style={styles.sessionItem}>
                 <h4>{booking.studentName} · {booking.slot}</h4>
                 <p>{booking.type === 'call' ? 'Call session' : 'Chat session'} · {booking.studentEmail}</p>
-                {booking.studentMobile && booking.studentMobile !== 'N/A' && (
-                  <a className="ui-button" href={`tel:${booking.studentMobile}`} style={styles.callLink}>Call student</a>
-                )}
-                {renderConversation(booking)}
+                {renderSessionActions(booking, 'student', booking.studentMobile)}
               </div>
             ))}
           </div>
@@ -896,10 +996,10 @@ export default function App() {
   // ==========================================
   if (user.role === 'SuperAdmin') {
     return (
-      <div style={styles.dashboard}>
+      <div className="dashboard-container" style={styles.dashboard}>
         {renderHeader('Super Admin Master Control Panel')}
 
-        <div style={styles.grid}>
+        <div className="dashboard-grid" style={styles.grid}>
           {/* Section 1: Admin Approvals */}
           <div className="dashboard-card" style={{ ...styles.card, gridColumn: 'span 2' }}>
             <h3>🛡️ Admin Registration Approvals</h3>
@@ -966,7 +1066,79 @@ export default function App() {
             </table>
           </div>
 
-          {/* Section 3: Preferred Colleges Manager */}
+          {/* Section 3: User Management */}
+          <div className="dashboard-card" style={{ ...styles.card, gridColumn: 'span 2' }}>
+            <h3>👥 Manage Students and Admins</h3>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allUsers.filter((entry) => ['Student', 'Admin'].includes(entry.role)).length === 0 ? (
+                  <tr><td colSpan="5">No student or admin accounts to manage.</td></tr>
+                ) : allUsers.filter((entry) => ['Student', 'Admin'].includes(entry.role)).map((entry) => (
+                  <tr key={entry.id}>
+                    <td>{entry.name}</td>
+                    <td>{entry.email}</td>
+                    <td>{entry.role}</td>
+                    <td>{entry.status}</td>
+                    <td>
+                      <button
+                        className="ui-button"
+                        type="button"
+                        onClick={() => handleRemoveUser(entry)}
+                        style={styles.btnDanger}
+                        aria-label={`Remove ${entry.role.toLowerCase()} ${entry.name}`}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Section 4: Super-admin-only session records */}
+          <div className="dashboard-card" style={{ ...styles.card, gridColumn: 'span 2' }}>
+            <h3>🔒 Student Safety Session Records</h3>
+            <p style={styles.recordNotice}>
+              Saved chat transcripts are restricted to this Super Admin records view. Phone calls use the device dialer and are not recorded.
+            </p>
+            {bookingRecords.length === 0 ? (
+              <p>No session records are available yet.</p>
+            ) : bookingRecords.map((booking) => (
+              <div key={booking.id} style={styles.sessionItem}>
+                <h4>{booking.studentName} · {booking.slot}</h4>
+                <p>
+                  {booking.type === 'call' ? 'Call session' : 'Chat session'} · {booking.status} ·
+                  {' '}{booking.adminName} · {booking.studentEmail}
+                </p>
+                {(booking.messages || []).length === 0 ? (
+                  <p>No chat messages were sent in this session.</p>
+                ) : (
+                  <div style={styles.messageThread}>
+                    {booking.messages.map((message) => (
+                      <p key={message.id} style={styles.messageItem}>
+                        <strong>{message.senderName}</strong>
+                        {' · '}{new Date(message.sentAt).toLocaleString()}
+                        <br />
+                        {message.body}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Section 5: Preferred Colleges Manager */}
           <div className="dashboard-card" style={{ ...styles.card, gridColumn: 'span 2' }}>
             <h3>🎓 Preferred College Cutoff Directory</h3>
             <div style={{ display: 'flex', gap: 10, marginBottom: 15 }}>
@@ -1025,11 +1197,13 @@ const styles = {
   headerActions: { display: 'flex', gap: 8, alignItems: 'center' },
   profileLabel: { display: 'grid', gap: 6, color: '#344054', fontSize: 13, fontWeight: 'bold' },
   userBadge: { fontSize: 12, background: 'linear-gradient(135deg, #edf4ff 0%, #ebf9f0 100%)', color: '#184a8d', padding: '6px 10px', borderRadius: 999, fontWeight: 'bold', border: '1px solid rgba(76, 103, 183, 0.12)' },
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 },
+  grid: { display: 'grid', gap: 20 },
   card: { background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)', padding: 20, borderRadius: 18, border: '1px solid #e5edf7', boxShadow: '0 10px 22px rgba(70, 94, 129, 0.08)' },
   table: { width: '100%', borderCollapse: 'collapse', marginTop: 10 },
   sessionItem: { borderTop: '1px solid #e3e9ef', padding: '14px 0' },
   conversation: { marginTop: 12 },
+  sessionActions: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  recordNotice: { margin: '10px 0 0', color: '#667085', fontSize: 13 },
   messageThread: { display: 'grid', gap: 8, maxHeight: 220, overflowY: 'auto', padding: 12, background: 'linear-gradient(180deg, #f8fbff 0%, #f2f8ff 100%)', border: '1px solid #e3e9ef', borderRadius: 10 },
   messageItem: { margin: 0, padding: '8px 10px', background: '#fff', border: '1px solid #e8edf2', borderRadius: 8, overflowWrap: 'anywhere' },
   messageForm: { display: 'flex', gap: 8, marginTop: 8 },

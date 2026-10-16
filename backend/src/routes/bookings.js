@@ -43,6 +43,14 @@ function serializeBooking(booking) {
 
 bookingsRouter.use(authenticate);
 
+bookingsRouter.get('/records', requireRoles('SuperAdmin'), asyncHandler(async (_request, response) => {
+  const bookings = await prisma.booking.findMany({
+    include: bookingInclude,
+    orderBy: { createdAt: 'desc' }
+  });
+  response.json(bookings.map(serializeBooking));
+}));
+
 bookingsRouter.get('/', requireRoles('Student', 'Admin', 'SuperAdmin'), asyncHandler(async (request, response) => {
   const where = request.user.role === 'Student'
     ? { userId: request.user.id }

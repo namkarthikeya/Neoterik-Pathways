@@ -39,8 +39,8 @@ To run only the backend, use `npm.cmd run dev:backend`. Check it at
 
 - `GET /api/health`
 - `POST /api/auth/register`, `POST /api/auth/login`, `GET`, `PATCH /api/auth/profile`
-- Authenticated `GET /api/users` for super-admins, `GET /api/users/dashboard` and `PATCH /api/users/students/:id/approve` for admins, `PATCH /api/users/:id` for super-admin approval
-- Authenticated `GET`, `POST /api/bookings`, `PATCH /api/bookings/:id/accept`, `POST /api/bookings/:id/messages`
+- Authenticated `GET /api/users` for super-admins, `GET /api/users/dashboard` and `PATCH /api/users/students/:id/approve` for admins, and `PATCH`/`DELETE /api/users/:id` for super-admin approval and student/admin account management
+- Authenticated `GET`, `POST /api/bookings`, `PATCH /api/bookings/:id/accept`, `POST /api/bookings/:id/messages`; Super Admin-only `GET /api/bookings/records` for saved chat session records
 - Super-admin-only `GET`, `POST /api/colleges`
 
 Run backend authentication and dashboard workflow tests with `npm.cmd run test:security --prefix backend`.
@@ -61,11 +61,13 @@ Free-tier services have limits and are intended for testing and hobby projects, 
 
 The API hashes passwords, issues expiring verifiable tokens, rate-limits authentication, restricts data endpoints by role, and seeds the super-admin from Render environment variables. Existing local plaintext passwords are upgraded to hashes on their next sign-in. Render configuration is preparation only; it does not deploy anything or create service URLs by itself.
 
+The app remembers a successful sign-in across launches using the server-issued session token, not the user's password. Sessions expire after 8 hours; after expiration, sign in again.
+
 For local super-admin access, set `SUPER_ADMIN_NAME`, `SUPER_ADMIN_EMAIL`, and a unique `SUPER_ADMIN_PASSWORD` in `backend/.env`, then run `npm.cmd --prefix backend run db:seed:super-admin`. Never reuse the placeholder values or share real credentials in chat.
 
 ## Android
 
-The React/Vite frontend is configured for Capacitor 8. Android builds require Android Studio with Android SDK 36 installed and Java 21 or newer available. The Android sync command requires the deployed API URL so it cannot package a build that points to `localhost`:
+The React/Vite frontend is configured for Capacitor 8. Android builds require Android Studio with Android SDK 36 installed and Java 21 or newer available. If Android Studio hits a Gradle download timeout while fetching the wrapper, the project wrapper is configured with a longer timeout to handle slower networks. The Android sync command requires the deployed API URL so it cannot package a build that points to `localhost`:
 
 ```powershell
 npm.cmd install --prefix frontend

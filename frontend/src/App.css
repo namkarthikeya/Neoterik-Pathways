@@ -30,13 +30,52 @@ body {
 }
 
 .dashboard-card {
+  min-width: 0;
   box-shadow: 0 4px 14px rgba(27, 41, 59, 0.05);
   transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.dashboard-card h3,
+.dashboard-card h4,
+.dashboard-card p,
+.dashboard-card td,
+.dashboard-card th {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .dashboard-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 22px rgba(27, 41, 59, 0.09);
+}
+
+.dashboard-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dashboard-header-title {
+  min-width: 0;
+}
+
+.dashboard-header-title h2 {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-header-actions {
+  flex-wrap: wrap;
+}
+
+.dashboard-user-badge {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .ui-button {
@@ -109,6 +148,22 @@ body {
 }
 
 @media (max-width: 600px) {
+  .dashboard-container {
+    padding: 16px !important;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-card[style*="span 2"] {
+    grid-column: 1 / -1 !important;
+  }
+
+  .dashboard-header {
+    align-items: flex-start !important;
+  }
+
   .profile-dialog {
     padding: 18px;
   }

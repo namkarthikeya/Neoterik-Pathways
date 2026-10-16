@@ -9,6 +9,7 @@ let server;
 let baseUrl;
 let studentToken;
 let superAdminToken;
+let superAdminId;
 let adminToken;
 let studentId;
 let adminId;
@@ -24,6 +25,7 @@ before(async () => {
       status: 'APPROVED'
     }
   });
+  superAdminId = admin.id;
   const counselor = await prisma.user.create({
     data: {
       name: 'Test Counselor',
@@ -217,6 +219,29 @@ test('student can create an owned booking; assigned admin can accept and message
   assert.equal(adminBooking.messages[0].body, 'Please confirm the meeting.');
 });
 
+test('session records are available only to super admins', async () => {
+  const unauthenticatedResponse = await fetch(`${baseUrl}/bookings/records`);
+  assert.equal(unauthenticatedResponse.status, 401);
+
+  const studentResponse = await fetch(`${baseUrl}/bookings/records`, {
+    headers: { Authorization: `Bearer ${studentToken}` }
+  });
+  assert.equal(studentResponse.status, 403);
+
+  const adminResponse = await fetch(`${baseUrl}/bookings/records`, {
+    headers: { Authorization: `Bearer ${adminToken}` }
+  });
+  assert.equal(adminResponse.status, 403);
+
+  const superAdminResponse = await fetch(`${baseUrl}/bookings/records`, {
+    headers: { Authorization: `Bearer ${superAdminToken}` }
+  });
+  assert.equal(superAdminResponse.status, 200);
+  const [record] = await superAdminResponse.json();
+  assert.equal(record.id, bookingId);
+  assert.equal(record.messages[0].body, 'Please confirm the meeting.');
+});
+
 test('sensitive write routes require an authorized role', async () => {
   const unauthenticated = await fetch(`${baseUrl}/colleges`, {
     method: 'POST',
@@ -244,4 +269,57 @@ test('sensitive write routes require an authorized role', async () => {
 
   const bookingResponse = await fetch(`${baseUrl}/bookings`);
   assert.equal(bookingResponse.status, 401);
+});
+
+test('only a super admin can remove students and admins while retaining booking history', async () => {
+  const assignedStudent = await prisma.user.create({
+    data: {
+      name: 'Student for removal',
+      email: 'remove-student@example.test',
+      password: 'test-password',
+      role: 'Student',
+      status: 'APPROVED',
+      assignedAdminId: adminId
+    }
+  });
+  const retainedBooking = await prisma.booking.create({
+    data: {
+      userId: assignedStudent.id,
+      adminId: adminId,
+      studentName: assignedStudent.name,
+      status: 'PENDING'
+    }
+  });
+
+  const forbiddenResponse = await fetch(`${baseUrl}/users/${assignedStudent.id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${studentToken}` }
+  });
+  assert.equal(forbiddenResponse.status, 403);
+
+  const removeStudentResponse = await fetch(`${baseUrl}/users/${assignedStudent.id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${superAdminToken}` }
+  });
+  assert.equal(removeStudentResponse.status, 204);
+  assert.equal(await prisma.user.findUnique({ where: { id: assignedStudent.id } }), null);
+  const studentBooking = await prisma.booking.findUnique({ where: { id: retainedBooking.id } });
+  assert.equal(studentBooking.userId, null);
+  assert.equal(studentBooking.studentName, assignedStudent.name);
+
+  const removeAdminResponse = await fetch(`${baseUrl}/users/${adminId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${superAdminToken}` }
+  });
+  assert.equal(removeAdminResponse.status, 204);
+  assert.equal(await prisma.user.findUnique({ where: { id: adminId } }), null);
+  const adminBooking = await prisma.booking.findUnique({ where: { id: retainedBooking.id } });
+  assert.equal(adminBooking.adminId, null);
+
+  const removeSuperAdminResponse = await fetch(`${baseUrl}/users/${superAdminId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${superAdminToken}` }
+  });
+  assert.equal(removeSuperAdminResponse.status, 404);
+  assert.notEqual(await prisma.user.findUnique({ where: { id: superAdminId } }), null);
 });
